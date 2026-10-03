@@ -55,6 +55,7 @@ docs/.vitepress/dist
 .env
 .dev.vars*
 deploy.sh
+!server_docker/scripts/deploy.sh
 .runtime/
 # wx_video_download Docker runtime / secrets
 server_docker/.env
