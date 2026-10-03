@@ -1,0 +1,25 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-18770}:8080"
+    environment:
+      BROWSERLESS_URL: ${BROWSERLESS_URL:-http://browserless:3000}
+      BROWSERLESS_TOKEN: ${BROWSERLESS_TOKEN}
+      WEBUI_USERNAME: ${WEBUI_USERNAME}
+      WEBUI_PASSWORD: ${WEBUI_PASSWORD}
+      SECRET_KEY: ${SECRET_KEY}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      YUANBAO_COOKIE_FILE: /data/yuanbao.tencent.com_cookies.txt
+      YUANBAO_SESSION_FILE: /data/yuanbao_session.json
+      BROWSERLESS_FUNCTION_FILE: /app/browserless_function.js
+      DATA_DIR: /data
+      DOWNLOAD_DIR: /data/downloads
+      BROWSER_TIMEOUT: "180"
+      DOWNLOAD_TIMEOUT: "300"
+    volumes:
+      - ./data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    mem_limit: "512m"

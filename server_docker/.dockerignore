@@ -1,0 +1,8 @@
+data
+.env
+app.env
+.web_password
+__pycache__
+*.pyc
+*.tgz
+.venv

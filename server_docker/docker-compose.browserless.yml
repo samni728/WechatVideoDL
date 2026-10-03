@@ -1,0 +1,21 @@
+services:
+  browserless:
+    image: ${BROWSERLESS_IMAGE:-browserless/chrome@sha256:57d19e414d9fe4ae9d2ab12ba768c97f38d51246c5b31af55a009205c136012f}
+    restart: unless-stopped
+    environment:
+      TOKEN: ${BROWSERLESS_TOKEN}
+      MAX_CONCURRENT_SESSIONS: "1"
+      CONNECTION_TIMEOUT: "300000"
+      ENABLE_FUNCTIONS: "true"
+      MAX_PAYLOAD_SIZE: "50mb"
+      PREBOOT_CHROME: "true"
+    shm_size: "512mb"
+    mem_limit: "900m"
+    expose:
+      - "3000"
+
+  app:
+    depends_on:
+      - browserless
+    environment:
+      BROWSERLESS_URL: http://browserless:3000
