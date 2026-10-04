@@ -15,6 +15,7 @@ from urllib.parse import quote, urlparse, parse_qsl, urlencode, urlunparse
 
 import requests
 from flask import Flask, Response, jsonify, redirect, render_template_string, request, send_from_directory, session, url_for
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 APP_DIR = Path(__file__).resolve().parent
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data")).resolve()
@@ -32,6 +33,8 @@ SECRET_KEY = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
 BROWSER_TIMEOUT = int(os.environ.get("BROWSER_TIMEOUT", "180"))
 DOWNLOAD_TIMEOUT = int(os.environ.get("DOWNLOAD_TIMEOUT", "300"))
+TRUST_PROXY_HEADERS = os.environ.get("TRUST_PROXY_HEADERS", "false").strip().lower() in {"1", "true", "yes", "on"}
+PROXY_HOPS = max(1, int(os.environ.get("PROXY_HOPS", "1")))
 
 USER_AGENT = os.environ.get(
     "BROWSER_USER_AGENT",
@@ -47,6 +50,15 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
 )
+if TRUST_PROXY_HEADERS:
+    app.wsgi_app = ProxyFix(
+        app.wsgi_app,
+        x_for=PROXY_HOPS,
+        x_proto=PROXY_HOPS,
+        x_host=PROXY_HOPS,
+        x_port=PROXY_HOPS,
+        x_prefix=PROXY_HOPS,
+    )
 
 
 class AppError(RuntimeError):
@@ -281,16 +293,45 @@ def media_info(path: Path) -> dict[str, Any] | None:
     return None
 
 
+def _first_forwarded(name: str, fallback: str = "") -> str:
+    raw = request.headers.get(name, "")
+    if not raw:
+        return fallback
+    values = [part.strip() for part in raw.split(",") if part.strip()]
+    return values[-1] if values else fallback
+
+
+def _trusted_prefix() -> str:
+    if not TRUST_PROXY_HEADERS:
+        return ""
+    prefix = _first_forwarded("X-Forwarded-Prefix", request.script_root or "")
+    if not prefix or prefix == "/":
+        return ""
+    return "/" + prefix.strip("/")
+
+
 def external_base() -> str:
     if PUBLIC_BASE_URL:
-        return PUBLIC_BASE_URL
-    scheme = request.headers.get("X-Forwarded-Proto", request.scheme).split(",")[0].strip()
-    host = request.headers.get("X-Forwarded-Host", request.host).split(",")[0].strip()
-    return f"{scheme}://{host}"
+        return PUBLIC_BASE_URL.rstrip("/")
+    if TRUST_PROXY_HEADERS:
+        scheme = _first_forwarded("X-Forwarded-Proto", request.scheme)
+        host = _first_forwarded("X-Forwarded-Host", request.host)
+        return f"{scheme}://{host}{_trusted_prefix()}"
+    return f"{request.scheme}://{request.host}"
+
+
+def build_file_links(name: str) -> dict[str, str]:
+    encoded = quote(Path(name).name)
+    prefix = _trusted_prefix() if not PUBLIC_BASE_URL else ""
+    download_path = f"{prefix}/files/{encoded}" if prefix else f"/files/{encoded}"
+    return {
+        "download_path": download_path,
+        "download_url": f"{external_base()}/files/{encoded}",
+    }
 
 
 def make_file_url(name: str) -> str:
-    return f"{external_base()}/files/{quote(name)}"
+    return build_file_links(name)["download_url"]
 
 
 def basic_credentials() -> tuple[str, str] | None:

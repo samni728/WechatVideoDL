@@ -11,6 +11,9 @@ services:
       WEBUI_PASSWORD: ${WEBUI_PASSWORD}
       SECRET_KEY: ${SECRET_KEY}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-false}
+      PROXY_HOPS: ${PROXY_HOPS:-1}
+      MAX_PARSE_ATTEMPTS: ${MAX_PARSE_ATTEMPTS:-3}
       YUANBAO_COOKIE_FILE: /data/yuanbao.tencent.com_cookies.txt
       YUANBAO_SESSION_FILE: /data/yuanbao_session.json
       BROWSERLESS_FUNCTION_FILE: /app/browserless_function.js
