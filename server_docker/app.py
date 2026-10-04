@@ -17,6 +17,15 @@ import requests
 from flask import Flask, Response, jsonify, redirect, render_template_string, request, send_from_directory, session, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+try:
+    from .history_store import HistoryStore
+    from .job_files import safe_owned_path
+    from .job_runner import run_parse_job
+except ImportError:  # Docker runs modules from /app.
+    from history_store import HistoryStore
+    from job_files import safe_owned_path
+    from job_runner import run_parse_job
+
 APP_DIR = Path(__file__).resolve().parent
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data")).resolve()
 DOWNLOAD_DIR = Path(os.environ.get("DOWNLOAD_DIR", DATA_DIR / "downloads")).resolve()
@@ -35,6 +44,9 @@ BROWSER_TIMEOUT = int(os.environ.get("BROWSER_TIMEOUT", "180"))
 DOWNLOAD_TIMEOUT = int(os.environ.get("DOWNLOAD_TIMEOUT", "300"))
 TRUST_PROXY_HEADERS = os.environ.get("TRUST_PROXY_HEADERS", "false").strip().lower() in {"1", "true", "yes", "on"}
 PROXY_HOPS = max(1, int(os.environ.get("PROXY_HOPS", "1")))
+MAX_PARSE_ATTEMPTS = max(1, int(os.environ.get("MAX_PARSE_ATTEMPTS", "3")))
+RETRY_SLEEPER = time.sleep
+HISTORY_STORE: HistoryStore | None = None
 
 USER_AGENT = os.environ.get(
     "BROWSER_USER_AGENT",
@@ -334,6 +346,80 @@ def make_file_url(name: str) -> str:
     return build_file_links(name)["download_url"]
 
 
+def get_history_store() -> HistoryStore:
+    global HISTORY_STORE
+    if HISTORY_STORE is None:
+        HISTORY_STORE = HistoryStore(DATA_DIR / "history.db")
+    return HISTORY_STORE
+
+
+def serialize_job(job: dict[str, Any]) -> dict[str, Any]:
+    result = {
+        "id": job["id"],
+        "created_at": job.get("created_at"),
+        "updated_at": job.get("updated_at"),
+        "input_url": job.get("input_url"),
+        "prompt": job.get("prompt"),
+        "preset_id": job.get("preset_id"),
+        "preset_name": job.get("preset_name"),
+        "output_format": job.get("output_format"),
+        "download_requested": job.get("download_requested"),
+        "status": job.get("status"),
+        "attempts_used": job.get("attempts_used", 0),
+        "max_attempts": job.get("max_attempts", MAX_PARSE_ATTEMPTS),
+        "retry_errors": job.get("retry_errors", []),
+        "error_code": job.get("error_code"),
+        "error_message": job.get("error_message"),
+        "content": job.get("yuanbao_content") or "",
+        "elapsed_ms": job.get("elapsed_ms"),
+        "yuanbao": {
+            "preview_url": job.get("preview_url"),
+        },
+    }
+    text_filename = job.get("text_filename")
+    if text_filename:
+        text_links = build_file_links(text_filename)
+        result["text"] = {
+            "filename": text_filename,
+            "bytes": job.get("text_bytes"),
+            **text_links,
+        }
+    else:
+        result["text"] = {"filename": None, "bytes": None, "download_path": None, "download_url": None}
+    video_filename = job.get("video_filename")
+    if video_filename:
+        video_links = build_file_links(video_filename)
+        video_path = safe_owned_path(DOWNLOAD_DIR, video_filename)
+        result["video"] = {
+            "source_direct_url": job.get("source_direct_url"),
+            "downloaded": True,
+            "filename": video_filename,
+            "bytes": job.get("video_bytes"),
+            **video_links,
+            "media": media_info(video_path) if video_path and video_path.exists() else None,
+        }
+    else:
+        result["video"] = {
+            "source_direct_url": job.get("source_direct_url"),
+            "downloaded": False,
+            "filename": None,
+            "bytes": None,
+            "download_path": None,
+            "download_url": None,
+            "media": None,
+        }
+    return result
+
+
+def failed_job_status(job: dict[str, Any]) -> int:
+    code = str(job.get("error_code") or "")
+    if code in {"YUANBAO_LOGIN_REQUIRED", "UNAUTHORIZED"}:
+        return 401
+    if code in {"BROWSERLESS_UNREACHABLE", "COOKIE_FILE_MISSING", "COOKIE_EMPTY"}:
+        return 503
+    return 502
+
+
 def basic_credentials() -> tuple[str, str] | None:
     auth = request.headers.get("Authorization", "")
     if not auth.lower().startswith("basic "):
@@ -469,7 +555,6 @@ def files(name: str):
 @app.route("/api/parse", methods=["POST"])
 @api_or_session_required
 def api_parse():
-    started = time.monotonic()
     try:
         body = request.get_json(force=True, silent=False) or {}
         input_url = valid_input_url(str(body.get("url") or ""))
@@ -477,40 +562,48 @@ def api_parse():
         prompt = str(prompt_raw).strip() if prompt_raw is not None else None
         if not prompt:
             prompt = None
+        output_format = str(body.get("output_format") or "txt").strip().lower()
+        if output_format not in {"txt", "md"}:
+            raise AppError("INVALID_OUTPUT_FORMAT", "output_format 仅支持 txt 或 md", 400)
         do_download = bool(body.get("download", True))
-
+        job_id = next_id()
+        store = get_history_store()
+        store.create_job(
+            id=job_id,
+            input_url=input_url,
+            prompt=prompt,
+            preset_id=None,
+            preset_name=None,
+            output_format=output_format,
+            download_requested=do_download,
+            max_attempts=MAX_PARSE_ATTEMPTS,
+        )
         with PROCESS_LOCK:
-            yuanbao = analyze_with_yuanbao(input_url, prompt)
-            job_id = next_id()
-            text_path = save_text(job_id, input_url, prompt, yuanbao["content"])
-            video_path = download_video(job_id, yuanbao["directUrl"], yuanbao["previewUrl"]) if do_download else None
-
-        result: dict[str, Any] = {
-            "ok": True,
-            "id": job_id,
-            "input_url": input_url,
-            "prompt": prompt,
-            "content": yuanbao["content"],
-            "yuanbao": {
-                "preview_url": yuanbao["previewUrl"],
-                "card": yuanbao.get("card"),
+            job = run_parse_job(
+                job_id,
+                input_url,
+                prompt,
+                None,
+                output_format,
+                do_download,
+                store=store,
+                download_dir=DOWNLOAD_DIR,
+                analyzer=analyze_with_yuanbao,
+                downloader=download_video,
+                max_attempts=MAX_PARSE_ATTEMPTS,
+                sleeper=RETRY_SLEEPER,
+            )
+        serialized = serialize_job(job)
+        if job.get("status") == "completed":
+            return jsonify({"ok": True, **serialized})
+        return jsonify({
+            "ok": False,
+            "error": {
+                "code": job.get("error_code") or "PARSE_FAILED",
+                "message": job.get("error_message") or "解析失败",
             },
-            "text": {
-                "filename": text_path.name,
-                "bytes": text_path.stat().st_size,
-                "download_url": make_file_url(text_path.name),
-            },
-            "video": {
-                "source_direct_url": yuanbao["directUrl"],
-                "downloaded": bool(video_path),
-                "download_url": make_file_url(video_path.name) if video_path else None,
-                "filename": video_path.name if video_path else None,
-                "bytes": video_path.stat().st_size if video_path else None,
-                "media": media_info(video_path) if video_path else None,
-            },
-            "elapsed_ms": int((time.monotonic() - started) * 1000),
-        }
-        return jsonify(result)
+            "job": serialized,
+        }), failed_job_status(job)
     except AppError as exc:
         return jsonify({"ok": False, "error": {"code": exc.code, "message": exc.message, "detail": exc.detail}}), exc.status
     except Exception as exc:
