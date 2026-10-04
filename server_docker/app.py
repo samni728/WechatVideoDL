@@ -21,10 +21,12 @@ try:
     from .history_store import HistoryStore
     from .job_files import safe_owned_path
     from .job_runner import run_parse_job
+    from .presets import PRESETS, get_preset
 except ImportError:  # Docker runs modules from /app.
     from history_store import HistoryStore
     from job_files import safe_owned_path
     from job_runner import run_parse_job
+    from presets import PRESETS, get_preset
 
 APP_DIR = Path(__file__).resolve().parent
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data")).resolve()
@@ -552,6 +554,60 @@ def files(name: str):
     return send_from_directory(DOWNLOAD_DIR, clean, as_attachment=True)
 
 
+@app.route("/api/presets", methods=["GET"])
+@api_or_session_required
+def api_presets():
+    return jsonify({"ok": True, "presets": PRESETS})
+
+
+def _valid_job_id(job_id: str) -> bool:
+    return bool(re.fullmatch(r"wxv_\d{6}", job_id or ""))
+
+
+@app.route("/api/history", methods=["GET"])
+@api_or_session_required
+def api_history():
+    try:
+        limit = int(request.args.get("limit", "100"))
+    except ValueError:
+        limit = 100
+    jobs = [serialize_job(job) for job in get_history_store().list_jobs(limit=limit)]
+    return jsonify({"ok": True, "jobs": jobs})
+
+
+@app.route("/api/history/<job_id>", methods=["GET"])
+@api_or_session_required
+def api_history_detail(job_id: str):
+    if not _valid_job_id(job_id):
+        return jsonify({"ok": False, "error": {"code": "INVALID_JOB_ID", "message": "任务 ID 格式不正确"}}), 400
+    job = get_history_store().get_job(job_id)
+    if job is None:
+        return jsonify({"ok": False, "error": {"code": "NOT_FOUND", "message": "历史记录不存在"}}), 404
+    return jsonify({"ok": True, "job": serialize_job(job)})
+
+
+@app.route("/api/history/<job_id>", methods=["DELETE"])
+@api_or_session_required
+def api_history_delete(job_id: str):
+    if not _valid_job_id(job_id):
+        return jsonify({"ok": False, "error": {"code": "INVALID_JOB_ID", "message": "任务 ID 格式不正确"}}), 400
+    store = get_history_store()
+    job = store.get_job(job_id)
+    if job is None:
+        return jsonify({"ok": False, "error": {"code": "NOT_FOUND", "message": "历史记录不存在"}}), 404
+    deleted_files: list[str] = []
+    for key in ("text_filename", "video_filename"):
+        path = safe_owned_path(DOWNLOAD_DIR, job.get(key))
+        if path and path.exists():
+            try:
+                path.unlink()
+                deleted_files.append(path.name)
+            except FileNotFoundError:
+                pass
+    store.delete_job(job_id)
+    return jsonify({"ok": True, "id": job_id, "deleted_files": deleted_files})
+
+
 @app.route("/api/parse", methods=["POST"])
 @api_or_session_required
 def api_parse():
@@ -566,14 +622,15 @@ def api_parse():
         if output_format not in {"txt", "md"}:
             raise AppError("INVALID_OUTPUT_FORMAT", "output_format 仅支持 txt 或 md", 400)
         do_download = bool(body.get("download", True))
+        preset = get_preset(str(body.get("preset_id") or "") or None)
         job_id = next_id()
         store = get_history_store()
         store.create_job(
             id=job_id,
             input_url=input_url,
             prompt=prompt,
-            preset_id=None,
-            preset_name=None,
+            preset_id=preset["id"] if preset else None,
+            preset_name=preset["name"] if preset else None,
             output_format=output_format,
             download_requested=do_download,
             max_attempts=MAX_PARSE_ATTEMPTS,
@@ -583,7 +640,7 @@ def api_parse():
                 job_id,
                 input_url,
                 prompt,
-                None,
+                preset,
                 output_format,
                 do_download,
                 store=store,
