@@ -14,7 +14,7 @@ from typing import Any
 from urllib.parse import quote, urlparse, parse_qsl, urlencode, urlunparse
 
 import requests
-from flask import Flask, Response, jsonify, redirect, render_template_string, request, send_from_directory, session, url_for
+from flask import Flask, Response, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 try:
@@ -451,57 +451,6 @@ def api_or_session_required(fn):
     return wrapped
 
 
-LOGIN_HTML = """
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>WX Video Login</title><style>
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0e1117;color:#e9eef6;margin:0;display:grid;place-items:center;min-height:100vh}
-.card{width:min(420px,90vw);background:#171c25;border:1px solid #283140;border-radius:18px;padding:28px;box-shadow:0 20px 80px #0008}
-h1{margin:0 0 20px;font-size:24px}input{box-sizing:border-box;width:100%;padding:12px 14px;margin:8px 0;border-radius:10px;border:1px solid #364052;background:#0f141c;color:#fff}
-button{width:100%;padding:12px;margin-top:12px;border:0;border-radius:10px;background:#3b82f6;color:#fff;font-weight:700;cursor:pointer}
-.err{color:#ff8b8b;margin-top:12px}</style></head><body><form class="card" method="post"><h1>WX Video Download</h1>
-<input name="username" placeholder="Username" autocomplete="username" required>
-<input name="password" type="password" placeholder="Password" autocomplete="current-password" required>
-<button type="submit">登录</button>{% if error %}<div class="err">{{ error }}</div>{% endif %}</form></body></html>
-"""
-
-INDEX_HTML = """
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>WX Video Download</title><style>
-:root{color-scheme:dark}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0b0f15;color:#e8edf5;margin:0}
-.wrap{max-width:980px;margin:38px auto;padding:0 18px}.top{display:flex;justify-content:space-between;align-items:center}.muted{color:#8996a8}
-.card{background:#151b24;border:1px solid #273140;border-radius:16px;padding:22px;margin-top:18px}
-label{display:block;font-weight:700;margin:14px 0 7px}input,textarea{box-sizing:border-box;width:100%;border:1px solid #344154;border-radius:10px;background:#0d121a;color:#fff;padding:12px}
-textarea{min-height:120px;resize:vertical}.row{display:flex;gap:12px;align-items:center}.row input[type=checkbox]{width:auto}
-button{padding:11px 18px;border:0;border-radius:10px;background:#3b82f6;color:white;font-weight:700;cursor:pointer}button:disabled{opacity:.5}
-pre{white-space:pre-wrap;word-break:break-word;background:#0a0e14;border-radius:10px;padding:14px;max-height:480px;overflow:auto}
-a{color:#72a7ff}.links a{display:inline-block;margin:6px 14px 6px 0}.spinner{display:none;color:#9fb4cf;margin-left:12px}
-</style></head><body><div class="wrap">
-<div class="top"><div><h1>微信视频号解析 / 下载</h1><div class="muted">Browserless Headless + Yuanbao + yt-dlp</div></div><a href="/logout">退出</a></div>
-<div class="card">
-<label>微信视频号 URL</label><input id="url" placeholder="https://weixin.qq.com/sph/..." autofocus>
-<label>Prompt（可选）</label><textarea id="prompt" placeholder="例如：总结一下这个视频的核心内容"></textarea>
-<div class="row"><input id="download" type="checkbox" checked><label for="download" style="margin:0;font-weight:500">下载 MP4</label></div>
-<div style="margin-top:18px"><button id="go">开始解析</button><span id="spin" class="spinner">处理中，可能需要 1–3 分钟…</span></div>
-</div>
-<div class="card" id="result" style="display:none"><div id="summary"></div><div class="links" id="links"></div><pre id="content"></pre><details><summary>完整 JSON</summary><pre id="json"></pre></details></div>
-</div><script>
-const go=document.getElementById("go"), spin=document.getElementById("spin"), result=document.getElementById("result");
-go.onclick=async()=>{go.disabled=true;spin.style.display="inline";result.style.display="none";
- try{const r=await fetch("/api/parse",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
- url:document.getElementById("url").value,prompt:document.getElementById("prompt").value||null,download:document.getElementById("download").checked})});
- const j=await r.json(); result.style.display="block"; document.getElementById("json").textContent=JSON.stringify(j,null,2);
- if(!j.ok){document.getElementById("summary").textContent=(j.error&&j.error.message)||"请求失败";document.getElementById("links").innerHTML="";document.getElementById("content").textContent="";return}
- document.getElementById("summary").textContent="任务 "+j.id+" 已完成";
- let links='<a href="'+j.text.download_url+'">下载 TXT</a>';
- if(j.video.download_url) links+='<a href="'+j.video.download_url+'">下载 MP4</a>';
- document.getElementById("links").innerHTML=links;
- document.getElementById("content").textContent=j.content||"";
- }catch(e){result.style.display="block";document.getElementById("summary").textContent="请求失败："+e}
- finally{go.disabled=false;spin.style.display="none"}};
-</script></body></html>
-"""
-
-
 @app.route("/login", methods=["GET", "POST"])
 def login():
     error = None
@@ -512,7 +461,7 @@ def login():
             session["logged_in"] = True
             return redirect(url_for("index"))
         error = "账号或密码错误"
-    return render_template_string(LOGIN_HTML, error=error)
+    return render_template("login.html", error=error)
 
 
 @app.route("/logout")
@@ -524,7 +473,13 @@ def logout():
 @app.route("/")
 @api_or_session_required
 def index():
-    return render_template_string(INDEX_HTML)
+    return render_template("index.html")
+
+
+@app.route("/history")
+@api_or_session_required
+def history_page():
+    return render_template("history.html")
 
 
 @app.route("/health")

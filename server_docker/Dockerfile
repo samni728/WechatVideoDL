@@ -7,7 +7,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py browserless_function.js ./
+COPY app.py browserless_function.js history_store.py job_files.py job_runner.py presets.py ./
+COPY templates ./templates
+COPY static ./static
 RUN mkdir -p /data/downloads
 
 EXPOSE 8080

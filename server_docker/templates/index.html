@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}工作台 · WechatVideoDL{% endblock %}
+{% block page %}workspace{% endblock %}
+{% block content %}
+<section class="page-intro">
+  <div>
+    <div class="eyebrow">WECHAT CHANNELS → KNOWLEDGE</div>
+    <h1>解析视频，也把内容留下来。</h1>
+    <p>粘贴视频号链接，选择一个提示词模板，剩下的由后台自动完成。遇到临时错误会自动重试，最多 3 次。</p>
+  </div>
+  <div class="health-pill" id="health-pill"><span class="status-dot"></span><span>服务状态检查中</span></div>
+</section>
+
+<section class="workspace-grid">
+  <div class="panel composer-panel">
+    <div class="panel-heading">
+      <div><span class="panel-index">01</span><h2>创建解析任务</h2></div>
+      <span class="panel-note">URL + Prompt</span>
+    </div>
+    <div class="field-stack">
+      <label class="field-label" for="video-url">微信视频号链接</label>
+      <div class="url-field-wrap">
+        <span class="field-icon">↗</span>
+        <input id="video-url" class="text-input" type="url" placeholder="https://weixin.qq.com/sph/..." autocomplete="off">
+      </div>
+    </div>
+
+    <div class="field-stack">
+      <div class="field-label-row"><label class="field-label" for="preset-select">提示词预设</label><span>选择后仍可自由修改</span></div>
+      <select id="preset-select" class="select-input"><option value="">自定义提示词</option></select>
+    </div>
+
+    <div class="field-stack">
+      <label class="field-label" for="prompt-input">Prompt</label>
+      <textarea id="prompt-input" class="text-area" rows="8" placeholder="例如：总结视频核心内容，并整理成可导入知识库的结构化笔记。"></textarea>
+    </div>
+
+    <div class="options-row">
+      <label class="compact-field">输出格式
+        <select id="output-format" class="select-input compact">
+          <option value="md" selected>Markdown (.md)</option>
+          <option value="txt">Plain Text (.txt)</option>
+        </select>
+      </label>
+      <label class="toggle-line"><input id="download-mp4" type="checkbox" checked><span class="toggle-ui"></span><span>同时下载 MP4</span></label>
+    </div>
+
+    <button id="parse-button" class="primary-button action-button" type="button">
+      <span>开始解析</span><span class="button-arrow">→</span>
+    </button>
+  </div>
+
+  <aside class="panel result-panel" id="result-panel" aria-live="polite">
+    <div class="panel-heading">
+      <div><span class="panel-index">02</span><h2>任务结果</h2></div>
+      <span id="result-status" class="status-badge idle">等待任务</span>
+    </div>
+    <div id="result-empty" class="result-empty">
+      <div class="orbital-mark"><span></span><span></span><span></span></div>
+      <h3>结果会出现在这里</h3>
+      <p>后台会完成元宝解析、真实视频地址获取、文本保存与可选 MP4 下载。</p>
+    </div>
+    <div id="result-content" class="result-content hidden">
+      <div class="metric-row">
+        <div><small>任务</small><strong id="result-id">—</strong></div>
+        <div><small>尝试次数</small><strong id="result-attempts">—</strong></div>
+        <div><small>格式</small><strong id="result-format">—</strong></div>
+      </div>
+      <div id="retry-notice" class="retry-notice hidden"></div>
+      <div class="download-row" id="download-links"></div>
+      <div class="content-preview">
+        <div class="field-label-row"><span class="field-label">元宝内容</span><button id="copy-content" class="text-button" type="button">复制</button></div>
+        <pre id="analysis-content"></pre>
+      </div>
+      <details class="technical-details"><summary>技术详情</summary><pre id="technical-json"></pre></details>
+    </div>
+    <div id="result-error" class="result-error hidden">
+      <div class="error-icon">!</div><div><h3>任务没有完成</h3><p id="error-message"></p></div>
+      <details id="error-details" class="technical-details hidden"><summary>服务器响应详情</summary><pre id="error-excerpt"></pre></details>
+    </div>
+  </aside>
+</section>
+{% endblock %}

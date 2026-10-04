@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}登录 · WechatVideoDL{% endblock %}
+{% block page %}login{% endblock %}
+{% block shell %}
+<div class="login-layout">
+  <section class="login-hero">
+    <div class="login-brand">
+      <img src="{{ url_for('static', filename='logo.svg') }}" alt="WechatVideoDL" class="login-logo">
+      <div>
+        <div class="eyebrow">SELF-HOSTED CONTENT WORKSPACE</div>
+        <h1>WechatVideoDL</h1>
+      </div>
+    </div>
+    <p>把微信视频号链接变成可下载视频与结构化知识。Browserless 无头运行，元宝负责理解，yt-dlp 负责保存。</p>
+    <div class="feature-strip">
+      <span>AI 内容提炼</span><span>MP4 + TXT/MD</span><span>可追溯历史</span>
+    </div>
+  </section>
+  <section class="login-panel">
+    <form class="login-card" method="post">
+      <div class="section-kicker">欢迎回来</div>
+      <h2>登录工作台</h2>
+      <p class="subtle">使用服务器配置的 WebUI 账号继续。</p>
+      <label>用户名<input name="username" autocomplete="username" required autofocus></label>
+      <label>密码<input name="password" type="password" autocomplete="current-password" required></label>
+      {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+      <button class="primary-button full" type="submit">进入 WechatVideoDL</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

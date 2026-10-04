@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}历史记录 · WechatVideoDL{% endblock %}
+{% block page %}history{% endblock %}
+{% block content %}
+<section class="page-intro history-intro">
+  <div><div class="eyebrow">ARCHIVE</div><h1>历史记录</h1><p>保存每一次解析的 Prompt、结果、TXT/MD 与 MP4。删除记录时只会删除该任务拥有的文件。</p></div>
+  <a class="secondary-button" href="{{ url_for('index') }}">＋ 新建任务</a>
+</section>
+<section class="history-toolbar panel slim-panel">
+  <div class="history-search-wrap"><span>⌕</span><input id="history-filter" type="search" placeholder="按任务 ID、链接或 Prompt 筛选"></div>
+  <button id="refresh-history" class="text-button" type="button">刷新</button>
+</section>
+<section id="history-list" class="history-list">
+  <div class="history-empty panel"><div class="orbital-mark small"><span></span><span></span><span></span></div><p>正在加载历史记录…</p></div>
+</section>
+{% endblock %}

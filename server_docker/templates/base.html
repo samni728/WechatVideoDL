@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="system">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>{% block title %}WechatVideoDL{% endblock %}</title>
+  <script>
+    (() => {
+      const saved = localStorage.getItem('wvd-theme') || 'system';
+      document.documentElement.dataset.theme = saved;
+    })();
+  </script>
+  <link rel="icon" href="{{ url_for('static', filename='logo.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body data-page="{% block page %}base{% endblock %}">
+  {% block shell %}
+  <div class="app-shell">
+    <header class="app-header">
+      <a class="brand" href="{{ url_for('index') }}" aria-label="WechatVideoDL 首页">
+        <img src="{{ url_for('static', filename='logo.svg') }}" alt="WechatVideoDL Logo" class="brand-logo">
+        <span class="brand-copy">
+          <strong>WechatVideoDL</strong>
+          <small>Video intelligence workspace</small>
+        </span>
+      </a>
+      <nav class="header-actions" aria-label="主导航">
+        <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="{{ url_for('index') }}">工作台</a>
+        <a class="nav-link {% if request.path.startswith('/history') %}active{% endif %}" href="/history">历史记录</a>
+        <label class="theme-control" aria-label="主题">
+          <span>主题</span>
+          <select id="theme-select">
+            <option value="system">跟随系统</option>
+            <option value="light">明亮</option>
+            <option value="dark">暗色</option>
+          </select>
+        </label>
+        <a class="nav-link muted-link" href="{{ url_for('logout') }}">退出</a>
+      </nav>
+    </header>
+    <main class="app-main">{% block content %}{% endblock %}</main>
+  </div>
+  {% endblock %}
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</body>
+</html>
