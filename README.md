@@ -176,9 +176,8 @@ WEBUI_PASSWORD=你设置的密码
 - Gunicorn
 - requests
 - yt-dlp
-- ffmpeg / ffprobe
 
-不需要在宿主机单独安装 Python、yt-dlp 或 ffmpeg。
+当前流程直接下载视频号 MP4，**不强制安装 ffmpeg / ffprobe**。如果容器中没有 `ffprobe`，API 的可选媒体元数据字段会是 `null`，不影响视频下载。宿主机也不需要单独安装 Python、yt-dlp 或 ffmpeg。
 
 ---
 
