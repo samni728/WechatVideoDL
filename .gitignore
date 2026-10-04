@@ -65,3 +65,7 @@ server_docker/.deploy-baseline/
 yuanbao_session.json
 __pycache__/
 *.pyc
+
+# Superpowers execution workspaces
+.worktrees/
+.superpowers/
