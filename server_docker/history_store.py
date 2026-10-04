@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -50,7 +51,7 @@ class HistoryStore:
         return conn
 
     def _init_schema(self) -> None:
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS jobs (
@@ -84,7 +85,7 @@ class HistoryStore:
 
     def _reconcile_running_jobs(self) -> None:
         now = utc_now()
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute(
                 """
                 UPDATE jobs
@@ -108,7 +109,7 @@ class HistoryStore:
         max_attempts: int,
     ) -> dict[str, Any]:
         now = utc_now()
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute(
                 """
                 INSERT INTO jobs (
@@ -146,7 +147,7 @@ class HistoryStore:
         values["updated_at"] = utc_now()
         keys = list(values)
         assignments = ", ".join(f"{key}=?" for key in keys)
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute(
                 f"UPDATE jobs SET {assignments} WHERE id=?",
                 [self._encode_value(key, values[key]) for key in keys] + [job_id],
@@ -155,7 +156,7 @@ class HistoryStore:
 
     def list_jobs(self, limit: int = 100) -> list[dict[str, Any]]:
         limit = max(1, min(int(limit), 500))
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             rows = conn.execute(
                 "SELECT * FROM jobs ORDER BY created_at DESC, id DESC LIMIT ?",
                 (limit,),
@@ -163,7 +164,7 @@ class HistoryStore:
         return [self._row_to_dict(row) for row in rows]
 
     def get_job(self, job_id: str) -> dict[str, Any] | None:
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
         return self._row_to_dict(row) if row else None
 
@@ -171,7 +172,7 @@ class HistoryStore:
         row = self.get_job(job_id)
         if row is None:
             return None
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute("DELETE FROM jobs WHERE id=?", (job_id,))
         return row
 
