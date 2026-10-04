@@ -12,6 +12,7 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/bin" "$TMP/project/data"
 cp "$ROOT/docker-compose.yml" "$TMP/project/docker-compose.yml"
+cp "$ROOT/Dockerfile" "$TMP/project/Dockerfile"
 [ -f "$ROOT/docker-compose.browserless.yml" ] && cp "$ROOT/docker-compose.browserless.yml" "$TMP/project/docker-compose.browserless.yml"
 mkdir -p "$TMP/project/scripts/lib"
 cp "$ROOT/scripts/lib/docker_compat.sh" "$TMP/project/scripts/lib/"
@@ -62,5 +63,12 @@ assert_not_contains "$(cat "$TMP/log2")" 'systemctl start'
 out3="$(cd "$TMP/project" && PATH="$TMP/bin:/usr/bin:/bin" FAKE_LOG="$TMP/log3" FAKE_INFO_OK=1 FAKE_IMAGE_EXISTS=0 bash "$DEPLOY" --dry-run 2>&1)"
 assert_contains "$out3" 'Browserless image : missing (will pull this image only)'
 assert_not_contains "$out3" 'install Docker'
+
+# APP_PORT in .env must be honored when the shell does not override it.
+printf 'APP_PORT=18771\n' > "$TMP/project/.env"
+: > "$TMP/log4"
+out4="$(cd "$TMP/project" && PATH="$TMP/bin:/usr/bin:/bin" FAKE_LOG="$TMP/log4" FAKE_INFO_OK=1 FAKE_IMAGE_EXISTS=1 bash "$DEPLOY" --dry-run 2>&1)"
+assert_contains "$out4" 'Application port  : 18771'
+rm -f "$TMP/project/.env"
 
 echo 'PASS: deployment safety behavior'

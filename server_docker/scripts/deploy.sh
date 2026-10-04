@@ -34,7 +34,7 @@ HELP
 done
 
 PROJECT_NAME="${COMPOSE_PROJECT_NAME:-wx-video-download}"
-APP_PORT="${APP_PORT:-18770}"
+APP_PORT="${APP_PORT:-}"
 BROWSERLESS_IMAGE="${BROWSERLESS_IMAGE:-}"
 
 read_env_value() {
@@ -42,6 +42,11 @@ read_env_value() {
   [ -f "$file" ] || return 0
   awk -v k="$key" 'index($0,k"=")==1 {sub("^[^=]*=",""); print; exit}' "$file"
 }
+
+if [ -z "$APP_PORT" ]; then
+  APP_PORT="$(read_env_value APP_PORT || true)"
+fi
+APP_PORT="${APP_PORT:-18770}"
 
 require_existing_docker
 require_compose
