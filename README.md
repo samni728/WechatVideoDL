@@ -12,50 +12,80 @@ WechatVideoDL 是一个面向 **微信视频号分享链接** 的自托管工具
 > 推荐部署：**Ubuntu / Debian + Docker + Docker Compose**。
 > 没有 Browserless 也没关系，项目可自动启动一份隔离的 Browserless 容器；如果服务器已经有兼容的 Browserless，部署脚本会优先复用，不会擅自重启已有服务。
 
-## 界面预览
+## 最新版界面与功能（2026-10）
 
-### 工作台 · 暗色
+下面的截图已按当前 `main` 分支重新生成，统一为 **1440 × 1000**。新版 UI 不再只是一个“输入 URL 的下载页”，而是一个轻量的视频号内容工作台：创建任务、选择 Prompt、查看自动重试、下载 MP4 / Markdown / TXT，以及管理历史记录都在同一套界面中完成。
+
+### 工作台 · 暗色模式
 
 ![WechatVideoDL dark workspace](docs/images/webui-dark.png)
 
-### 工作台 · 亮色
+暗色工作台包含视频号 URL、Prompt 预设、可编辑 Prompt、Markdown/TXT 输出选择、MP4 下载开关，以及右侧任务结果区。任务执行期间会显示状态；成功后可直接下载文本和视频，并查看尝试次数与技术详情。
+
+### 工作台 · 明亮模式
 
 ![WechatVideoDL light workspace](docs/images/webui-light.png)
+
+同一套 UI 支持 **Light / Dark / System** 三种主题，主题偏好保存在浏览器本地，刷新后继续生效。
 
 ### 历史记录
 
 ![WechatVideoDL history](docs/images/webui-history.png)
 
+历史页使用 SQLite 持久化任务。每条记录保留来源 URL、Prompt、预设、输出格式、任务状态、尝试次数和文件信息；可以查看详情、重新下载 MD/TXT/MP4，也可以删除该任务以及它拥有的关联文件。
+
 ### 登录页
 
 ![WechatVideoDL login](docs/images/webui-login.png)
 
+WebUI 使用单账号登录；API 同时支持 HTTP Basic Auth。Cookie、Session、历史数据库和下载文件都只保存在服务器本地 `/data`，不会被打包进镜像。
+
 ---
 
-## 功能
+## 新版功能一览
+
+| 功能 | 当前行为 |
+| --- | --- |
+| 自动重试 | 瞬时 Browserless / 上游 / 下载错误自动重试，**最多 3 次总尝试** |
+| 错误提示 | 反代返回 HTML / 502 时不会再出现 `Unexpected token '<'`，而是显示可读错误 |
+| Prompt 预设 | 内置 5 个精选模板，选择后自动填入 textarea，用户仍可继续编辑 |
+| 文本格式 | WebUI 默认 Markdown，可切换 `.md` / `.txt`；API 兼容默认 `.txt` |
+| 历史记录 | SQLite `/data/history.db` 持久化成功/失败任务 |
+| 历史删除 | 删除记录时同步删除该任务拥有的 MD/TXT/MP4；不会接受任意文件路径 |
+| 下载文件名 | 使用 `wxv_000001.md` / `wxv_000001.mp4` 这种短序号 |
+| 主题 | Light / Dark / System 三种主题，浏览器本地记忆偏好 |
+| Logo / UI | 新 Logo、响应式双栏工作台、独立历史页和登录页 |
+| 反向代理 | 支持 Nginx / Caddy / Cloudflare，识别可信 `X-Forwarded-*` 与 path prefix |
+| 下载 URL | API 同时返回相对 `download_path` 与绝对 `download_url`，WebUI 优先使用相对路径 |
+| Browserless | 真正无头 Chromium；业务容器直接调用 `/function`，**不需要 Playwright SDK** |
+| 防自动播放 | Chromium 静音、覆盖 `play()`、`no_autoplay`、阻断 media request |
+| 部署保护 | 部署脚本优先复用兼容 Browserless，并避免停止服务器上的其他 Docker 项目 |
+
+### 内置 Prompt 预设
+
+1. **脚本 / 字幕 / 文案提炼**：整理完整口播脚本、字幕脉络、核心文案与结构。
+2. **工程项目核心框架**：提炼项目目标、背景、技术方案、实施步骤、资源、风险和结果。
+3. **知识库标签与元数据**：提取主题、标签、实体、关键词、关键结论和摘要，方便知识库导入。
+4. **短视频卖点与传播结构**：拆解开场钩子、核心卖点、论证、节奏、转折和行动号召。
+5. **结构化知识笔记**：输出一句话结论、核心观点、关键事实、延伸问题和执行清单。
+
+所有预设都只是起始模板。选择后 Prompt 会自动填入输入框，你可以在提交前自由修改。
+
+### 核心能力
 
 - 微信视频号短分享链接解析：`https://weixin.qq.com/sph/...`
 - 调用腾讯元宝理解视频内容并返回文本
 - 可选 Prompt，自定义提炼方向
-- 5 个内置 Prompt 预设，选择后仍可自由修改
 - 自动解析完整 `channels.weixin.qq.com/finder-preview/...` URL
 - 自动解析真实 `finder.video.qq.com/...` 视频 URL
 - `yt-dlp` 下载 MP4
 - 文本输出可选 `.txt` 或 `.md`
-- 文件采用短序号：`wxv_000001.mp4` / `wxv_000001.md`
-- **最多 3 次自动重试**，不需要用户重复点击
-- 失败记录也会进入历史，可查看最终错误与尝试次数
+- **最多 3 次自动重试**，失败记录同样进入历史
 - SQLite 持久化历史记录：`/data/history.db`
-- 历史页可查看内容、重新下载 MP4 / TXT / MD、删除任务及关联文件
-- WebUI 单账号登录
-- API HTTP Basic Auth
+- WebUI 单账号登录 + API HTTP Basic Auth
 - Light / Dark / System 三种主题
-- 全新 WechatVideoDL Logo 与响应式 WebUI
-- Browserless 真正无头运行，不弹桌面浏览器
-- Chromium 静音、禁止自动播放并拦截媒体请求
-- 支持 Nginx / Caddy / Cloudflare 反向代理
-- API 同时返回相对 `download_path` 和绝对 `download_url`
-- Docker 部署脚本会保护服务器上已有 Docker / Compose 项目
+- Browserless 无头运行，不弹桌面浏览器
+- 支持反代域名、HTTPS 与子路径部署
 
 ---
 

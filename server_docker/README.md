@@ -16,6 +16,24 @@ Browserless Headless Chromium
 
 ![WebUI](../docs/images/webui-dark.png)
 
+当前 Docker 版对应最新版 WebUI，已经包含：
+
+- 最多 3 次自动重试；
+- SQLite 历史记录与任务详情；
+- Markdown / TXT 输出选择；
+- 5 个可编辑 Prompt 预设；
+- Light / Dark / System 三种主题；
+- 历史任务的 MD/TXT/MP4 下载与安全删除；
+- 反向代理真实域名、HTTPS 与 path prefix 支持；
+- 非 JSON / HTML 502 代理错误的友好提示。
+
+更多界面截图：
+
+- [暗色工作台](../docs/images/webui-dark.png)
+- [明亮工作台](../docs/images/webui-light.png)
+- [历史记录](../docs/images/webui-history.png)
+- [登录页](../docs/images/webui-login.png)
+
 完整项目说明请同时阅读根目录 [`README.md`](../README.md)。
 
 ---
