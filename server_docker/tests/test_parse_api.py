@@ -99,6 +99,20 @@ class ParseApiTests(unittest.TestCase):
         self.assertEqual(body["error"]["code"], "INVALID_OUTPUT_FORMAT")
         self.assertEqual(calls, [])
 
+    def test_malformed_json_returns_json_400(self):
+        r = self.client.post("/api/parse", data="{bad", headers=self.auth())
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.content_type, "application/json")
+        body = r.get_json()
+        self.assertFalse(body["ok"])
+        self.assertEqual(body["error"]["code"], "BAD_REQUEST")
+
+    def test_next_id_recovers_from_text_only_artifacts(self):
+        (self.downloads / "wxv_000042.md").write_text("old", encoding="utf-8")
+        if appmod.SEQUENCE_FILE.exists():
+            appmod.SEQUENCE_FILE.unlink()
+        self.assertEqual(appmod.next_id(), "wxv_000043")
+
     def test_failed_job_returns_json_with_attempt_metadata(self):
         class UpstreamError(RuntimeError):
             code = "BROWSERLESS_UNREACHABLE"

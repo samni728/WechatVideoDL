@@ -135,6 +135,30 @@ class JobRunnerTests(unittest.TestCase):
         self.assertEqual((self.downloads / f"{self.job_id}.mp4").read_bytes(), b"final")
         self.assertTrue((self.downloads / f"{self.job_id}.md").exists())
 
+    def test_retry_attempts_are_capped_at_three(self):
+        calls = []
+        def analyzer(url, prompt):
+            calls.append(1)
+            raise FakeError("BROWSERLESS_ERROR")
+
+        row = run_parse_job(
+            self.job_id,
+            "https://weixin.qq.com/sph/demo",
+            "summary",
+            None,
+            "md",
+            True,
+            store=self.store,
+            download_dir=self.downloads,
+            analyzer=analyzer,
+            downloader=self.downloader,
+            max_attempts=10,
+            sleeper=lambda _: None,
+        )
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(row["attempts_used"], 3)
+        self.assertEqual(row["max_attempts"], 3)
+
     def test_retry_classifier(self):
         self.assertTrue(is_retryable_error(FakeError("BROWSERLESS_UNREACHABLE")))
         self.assertTrue(is_retryable_error(FakeError("DOWNLOAD_TIMEOUT", status=504)))

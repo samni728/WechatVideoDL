@@ -1,7 +1,13 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const page = document.body?.dataset.page || "";
+  const basePath = (document.body?.dataset.basePath || "").replace(/\/+$/, "");
   const themeSelect = $("theme-select");
+
+  function routePath(path) {
+    const suffix = String(path || "").replace(/^\/+/, "");
+    return `${basePath}/${suffix}`;
+  }
 
   function applyTheme(value) {
     const theme = ["light", "dark", "system"].includes(value) ? value : "system";
@@ -57,7 +63,7 @@
     let presets = [];
 
     try {
-      const data = await safeFetch("/api/presets"); presets = data.presets || [];
+      const data = await safeFetch(routePath("api/presets")); presets = data.presets || [];
       presets.forEach((preset) => { const option = document.createElement("option"); option.value = preset.id; option.textContent = preset.name; presetSelect.appendChild(option); });
     } catch (_) {}
     presetSelect.addEventListener("change", () => {
@@ -67,7 +73,7 @@
     });
 
     try {
-      const health = await safeFetch("/health");
+      const health = await safeFetch(routePath("health"));
       if (health.ok) { healthPill.classList.add("ok"); healthPill.querySelector("span:last-child").textContent = "服务在线"; }
     } catch (_) { healthPill.querySelector("span:last-child").textContent = "服务状态未知"; }
 
@@ -78,7 +84,7 @@
       resultEmpty.classList.add("hidden"); resultContent.classList.add("hidden"); resultError.classList.add("hidden");
       setStatus(resultStatus, "处理中", "running");
       try {
-        const data = await safeFetch("/api/parse", {
+        const data = await safeFetch(routePath("api/parse"), {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ url, prompt: promptInput.value.trim() || null, preset_id: presetSelect.value || null, output_format: outputFormat.value, download: downloadMp4.checked })
         });
@@ -120,7 +126,7 @@
     };
     const load = async () => {
       root.innerHTML = '<div class="history-empty panel">正在加载历史记录…</div>';
-      try { const data = await safeFetch("/api/history"); jobs = data.jobs || []; render(); }
+      try { const data = await safeFetch(routePath("api/history")); jobs = data.jobs || []; render(); }
       catch (error) { root.replaceChildren(); const box = document.createElement("div"); box.className = "history-empty panel"; box.textContent = error.message; root.appendChild(box); }
     };
     filter.addEventListener("input", render); refresh.addEventListener("click", load); await load();
@@ -144,8 +150,8 @@
     const del = document.createElement("button"); del.className = "danger-button"; del.type = "button"; del.textContent = "删除";
     actions.append(detailBtn, del); card.append(main, actions);
     const detail = document.createElement("div"); detail.className = "history-detail hidden"; const pre = document.createElement("pre"); detail.appendChild(pre); card.appendChild(detail);
-    detailBtn.addEventListener("click", async () => { if (!detail.classList.contains("hidden")) { detail.classList.add("hidden"); return; } try { const data = await safeFetch(`/api/history/${encodeURIComponent(job.id)}`); pre.textContent = data.job.content || data.job.error_message || "没有文本内容"; detail.classList.remove("hidden"); } catch (e) { pre.textContent = e.message; detail.classList.remove("hidden"); } });
-    del.addEventListener("click", async () => { if (!window.confirm(`确定删除 ${job.id} 及其关联文件吗？此操作不可恢复。`)) return; del.disabled = true; try { await safeFetch(`/api/history/${encodeURIComponent(job.id)}`, { method: "DELETE" }); await reload(); } catch (e) { window.alert(e.message); del.disabled = false; } });
+    detailBtn.addEventListener("click", async () => { if (!detail.classList.contains("hidden")) { detail.classList.add("hidden"); return; } try { const data = await safeFetch(routePath(`api/history/${encodeURIComponent(job.id)}`)); pre.textContent = data.job.content || data.job.error_message || "没有文本内容"; detail.classList.remove("hidden"); } catch (e) { pre.textContent = e.message; detail.classList.remove("hidden"); } });
+    del.addEventListener("click", async () => { if (!window.confirm(`确定删除 ${job.id} 及其关联文件吗？此操作不可恢复。`)) return; del.disabled = true; try { await safeFetch(routePath(`api/history/${encodeURIComponent(job.id)}`), { method: "DELETE" }); await reload(); } catch (e) { window.alert(e.message); del.disabled = false; } });
     return card;
   }
 

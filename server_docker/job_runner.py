@@ -88,7 +88,7 @@ def run_parse_job(
 ) -> dict[str, Any]:
     started = time.monotonic()
     retry_errors: list[dict[str, Any]] = []
-    max_attempts = max(1, int(max_attempts))
+    max_attempts = min(3, max(1, int(max_attempts)))
 
     for attempt in range(1, max_attempts + 1):
         store.update_job(

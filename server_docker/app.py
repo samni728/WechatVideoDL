@@ -15,6 +15,7 @@ from urllib.parse import quote, urlparse, parse_qsl, urlencode, urlunparse
 
 import requests
 from flask import Flask, Response, jsonify, redirect, render_template, request, send_from_directory, session, url_for
+from werkzeug.exceptions import BadRequest
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 try:
@@ -46,7 +47,7 @@ BROWSER_TIMEOUT = int(os.environ.get("BROWSER_TIMEOUT", "180"))
 DOWNLOAD_TIMEOUT = int(os.environ.get("DOWNLOAD_TIMEOUT", "300"))
 TRUST_PROXY_HEADERS = os.environ.get("TRUST_PROXY_HEADERS", "false").strip().lower() in {"1", "true", "yes", "on"}
 PROXY_HOPS = max(1, int(os.environ.get("PROXY_HOPS", "1")))
-MAX_PARSE_ATTEMPTS = max(1, int(os.environ.get("MAX_PARSE_ATTEMPTS", "3")))
+MAX_PARSE_ATTEMPTS = min(3, max(1, int(os.environ.get("MAX_PARSE_ATTEMPTS", "3"))))
 RETRY_SLEEPER = time.sleep
 HISTORY_STORE: HistoryStore | None = None
 
@@ -233,8 +234,8 @@ def next_id() -> str:
         except Exception:
             current = 0
     if current <= 0:
-        for path in DOWNLOAD_DIR.glob("wxv_*.mp4"):
-            m = re.fullmatch(r"wxv_(\d+)\.mp4", path.name)
+        for path in DOWNLOAD_DIR.glob("wxv_*.*"):
+            m = re.fullmatch(r"wxv_(\d+)\.(?:txt|md|mp4)", path.name)
             if m:
                 current = max(current, int(m.group(1)))
     current += 1
@@ -312,7 +313,10 @@ def _first_forwarded(name: str, fallback: str = "") -> str:
     if not raw:
         return fallback
     values = [part.strip() for part in raw.split(",") if part.strip()]
-    return values[-1] if values else fallback
+    hops = max(1, int(PROXY_HOPS))
+    if len(values) < hops:
+        return fallback
+    return values[-hops]
 
 
 def _trusted_prefix() -> str:
@@ -616,6 +620,8 @@ def api_parse():
             },
             "job": serialized,
         }), failed_job_status(job)
+    except BadRequest as exc:
+        return jsonify({"ok": False, "error": {"code": "BAD_REQUEST", "message": "请求 JSON 格式不正确", "detail": str(exc)}}), 400
     except AppError as exc:
         return jsonify({"ok": False, "error": {"code": exc.code, "message": exc.message, "detail": exc.detail}}), exc.status
     except Exception as exc:

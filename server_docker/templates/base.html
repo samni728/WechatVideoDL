@@ -14,7 +14,7 @@
   <link rel="icon" href="{{ url_for('static', filename='logo.svg') }}" type="image/svg+xml">
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
 </head>
-<body data-page="{% block page %}base{% endblock %}">
+<body data-page="{% block page %}base{% endblock %}" data-base-path="{{ request.script_root }}">
   {% block shell %}
   <div class="app-shell">
     <header class="app-header">
@@ -27,7 +27,7 @@
       </a>
       <nav class="header-actions" aria-label="主导航">
         <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="{{ url_for('index') }}">工作台</a>
-        <a class="nav-link {% if request.path.startswith('/history') %}active{% endif %}" href="/history">历史记录</a>
+        <a class="nav-link {% if request.path.startswith('/history') %}active{% endif %}" href="{{ url_for('history_page') }}">历史记录</a>
         <label class="theme-control" aria-label="主题">
           <span>主题</span>
           <select id="theme-select">

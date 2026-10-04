@@ -28,15 +28,26 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn('id="preset-select"', index)
         self.assertIn('id="prompt-input"', index)
         self.assertIn('<option value="md" selected>', index)
-        self.assertIn("/api/presets", js)
+        self.assertIn('routePath("api/presets")', js)
         self.assertIn("promptInput.value", js)
 
     def test_history_supports_download_detail_and_confirmed_delete(self):
         js = (ROOT / "static" / "app.js").read_text("utf-8")
-        self.assertIn("/api/history", js)
+        self.assertIn('routePath("api/history")', js)
         self.assertIn("window.confirm", js)
         self.assertIn("method: \"DELETE\"", js)
         self.assertIn("download_path", js)
+
+    def test_frontend_routes_respect_reverse_proxy_prefix(self):
+        base = (ROOT / "templates" / "base.html").read_text("utf-8")
+        js = (ROOT / "static" / "app.js").read_text("utf-8")
+        self.assertIn('data-base-path="{{ request.script_root }}"', base)
+        self.assertIn("url_for('history_page')", base)
+        self.assertIn("function routePath", js)
+        self.assertIn('routePath("api/presets")', js)
+        self.assertIn('routePath("api/history")', js)
+        self.assertNotIn('safeFetch("/api/', js)
+        self.assertNotIn('safeFetch(`/api/', js)
 
     def test_css_has_light_dark_and_responsive_layout(self):
         css = (ROOT / "static" / "app.css").read_text("utf-8")
